@@ -94,6 +94,47 @@ var GooglePlusProxy = {
         });
     },
 
+    initializeGoogleDriveClient: function (success, error) {
+        if (!__googleSdkReady) {
+            return __googleCallbacks.push(function() {
+                this.initializeGoogleDrive(success, error);
+            });
+        }
+
+        gapi.load('client', { callback:
+            function() {
+                gapi.client.init({
+                    apiKey: "GOOGLE_API_KEY",
+                    discoveryDocs:["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"]
+                })
+                .then(success, function(err) {
+                    error(err);
+                });
+              }
+        });
+    },
+
+    createFile:function (success, error, options) {
+        if (!__googleSdkReady) {
+            return __googleCallbacks.push(function() {
+                this.createFile(success, error, options);
+            });
+        }
+
+        GooglePlusProxy.initializeGoogleDriveClient(function() {
+            gapi.client.drive.files.create({
+                  ignoreDefaultVisibility:false,
+                  keepRevisionForever:true,
+                  supportsAllDrives:true,
+                  supportsTeamDrives:true,
+                  useContentAsIndexableText:true,
+                  alt:'json'
+            }).execute(function(resp, raw_resp) {
+                 console.log('Folder Id: ', resp.id);
+            });
+        }, error);
+    },
+
     getSigningCertificateFingerprint: function (success, error) {
         console.warn('Not implemented.');
         console.trace();
