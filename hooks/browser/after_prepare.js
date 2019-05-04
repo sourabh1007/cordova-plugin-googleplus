@@ -13,12 +13,19 @@ var getPreferenceValue = function(config, name) {
 };
 
 var WEB_APPLICATION_CLIENT_ID = '';
-
 if(process.argv.join("|").indexOf("WEB_APPLICATION_CLIENT_ID=") > -1) {
-    WEB_APPLICATION_CLIENT_ID = process.argv.join("|").match(/WEB_APPLICATION_CLIENT_ID=(.*?)(\||$)/)[1]
+    WEB_APPLICATION_CLIENT_ID = process.argv.join("|").match(/WEB_APPLICATION_CLIENT_ID=(.*?)(\||$)/)[1];
 } else {
     var config = fs.readFileSync("config.xml").toString();
     WEB_APPLICATION_CLIENT_ID = getPreferenceValue(config, "WEB_APPLICATION_CLIENT_ID");
+}
+
+var GOOGLE_SCOPES = '';
+if(process.argv.join("|").indexOf("GOOGLE_SCOPES=") > -1) {
+    GOOGLE_SCOPES = process.argv.join("|").match(/GOOGLE_SCOPES=(.*?)(\||$)/)[1];
+} else {
+    var config = fs.readFileSync("config.xml").toString();
+    GOOGLE_SCOPES = getPreferenceValue(config, "GOOGLE_SCOPES");
 }
 
 var files = [
@@ -30,5 +37,7 @@ for(var i=0; i<files.length; i++) {
     try {
         var contents = fs.readFileSync(files[i]).toString();
         fs.writeFileSync(files[i], contents.replace(/WEB_APPLICATION_CLIENT_ID/g, WEB_APPLICATION_CLIENT_ID));
+        contents = fs.readFileSync(files[i]).toString();
+        fs.writeFileSync(files[i], contents.replace(/GOOGLE_SCOPES/g, GOOGLE_SCOPES));
     } catch(err) {}
 }
