@@ -94,7 +94,7 @@ var GooglePlusProxy = {
         });
     },
 
-    initializeGoogleDriveClient: function (success, error) {
+    _initializeGoogleDriveClient: function (success, error) {
         if (!__googleSdkReady) {
             return __googleCallbacks.push(function() {
                 this.initializeGoogleDrive(success, error);
@@ -121,7 +121,7 @@ var GooglePlusProxy = {
             });
         }
 
-        GooglePlusProxy.initializeGoogleDriveClient(function() {
+        GooglePlusProxy._initializeGoogleDriveClient(function() {
             gapi.client.drive.files.create({
                   ignoreDefaultVisibility:false,
                   keepRevisionForever:true,

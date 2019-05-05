@@ -8,15 +8,15 @@
 
   <description>Use your Google account to authenticate with the app.</description>
 
-  <author>Eddy Verbruggen</author>
+  <author>Sourabh Jain</author>
 
   <license>MIT</license>
 
-  <keywords>Google, Google SignIn, GoogleSignIn, Google Login, Login, OAuth, Identity, Authentication</keywords>
+  <keywords>Google, Google SignIn, GoogleSignIn, Google Login, Login, OAuth, Identity, Authentication, Google Drive</keywords>
 
-  <repo>https://github.com/EddyVerbruggen/cordova-plugin-googleplus.git</repo>
+  <repo>https://github.com/sourabh1007/cordova-plugin-googleplus.git</repo>
 
-  <issue>https://github.com/EddyVerbruggen/cordova-plugin-googleplus/issues</issue>
+  <issue>https://github.com/sourabh1007/cordova-plugin-googleplus/issues</issue>
 
   <engines>
     <engine name="cordova" version=">=7.1.0"/>
@@ -33,6 +33,8 @@
 	<preference name="PLAY_SERVICES_VERSION" default="11.8.0"/>
     <framework src="com.google.android.gms:play-services-auth:$PLAY_SERVICES_VERSION" />
     <framework src="com.google.android.gms:play-services-identity:$PLAY_SERVICES_VERSION" />
+    <framework src="com.google.apis:google-api-services-drive:v3-rev110-1.23.0" />
+    <framework src="com.google.http-client:google-http-client-gson:1.23.0" />
 
     <config-file target="res/xml/config.xml" parent="/*">
       <feature name="GooglePlus">
@@ -48,6 +50,8 @@
     </config-file>
 
     <source-file src="src/android/GooglePlus.java" target-dir="src/nl/xservices/plugins"/>
+    <source-file src="src/android/GoogleDrive.java" target-dir="src/nl/xservices/plugins"/>
+
   </platform>
 
   <!-- ios -->
@@ -99,8 +103,8 @@
     <framework src="libz.tbd" weak="true" />
     <framework src="libz.dylib" weak="true" />
 
-		<hook type="after_plugin_install" src="hooks/ios/prerequisites.js"/>
-		<hook type="after_plugin_install" src="hooks/ios/install_entitlements.js" />
+    <hook type="after_plugin_install" src="hooks/ios/prerequisites.js"/>
+    <hook type="after_plugin_install" src="hooks/ios/install_entitlements.js" />
   </platform>
 
   <!-- browser -->

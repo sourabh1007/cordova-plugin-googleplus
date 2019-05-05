@@ -4,8 +4,8 @@
   "cordova_name": "Google SignIn",
   "description": "Use your Google account to authenticate with the app.",
   "license": "MIT",
-  "repo": "https://github.com/EddyVerbruggen/cordova-plugin-googleplus.git",
-  "issue": "https://github.com/EddyVerbruggen/cordova-plugin-googleplus/issues",
+  "repo": "https://github.com/sourabh1007/cordova-plugin-googleplus.git",
+  "issue": "https://github.com/sourabh1007/cordova-plugin-googleplus/issues",
   "keywords": [
     "Google",
     "Google SignIn",
@@ -19,7 +19,8 @@
     "Authentication",
     "ecosystem:cordova",
     "cordova-android",
-    "cordova-ios"
+    "cordova-ios",
+    "Google Drive"
   ],
   "platforms": [
     "android",

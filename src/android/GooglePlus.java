@@ -3,28 +3,34 @@ package nl.xservices.plugins;
 import android.accounts.Account;
 import android.accounts.AccountManager;
 import android.accounts.AccountManagerFuture;
-import android.accounts.AuthenticatorException;
-import android.accounts.OperationCanceledException;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.Signature;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
 
 import com.google.android.gms.auth.api.Auth;
-import com.google.android.gms.auth.api.signin.GoogleSignInResult;
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.gms.auth.api.signin.GoogleSignInResult;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.ResultCallback;
-import com.google.android.gms.common.api.Status;
 import com.google.android.gms.common.api.Scope;
+import com.google.android.gms.common.api.Status;
+import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
+import com.google.api.services.drive.model.File;
+import com.google.gson.Gson;
 
-import org.apache.cordova.*;
-import org.apache.cordova.engine.SystemWebChromeClient;
+import org.apache.cordova.CallbackContext;
+import org.apache.cordova.CordovaArgs;
+import org.apache.cordova.CordovaInterface;
+import org.apache.cordova.CordovaPlugin;
+import org.apache.cordova.CordovaWebView;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -35,8 +41,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
-import android.content.pm.Signature;
+import java.util.List;
 
 /**
  * Originally written by Eddy Verbruggen (http://github.com/EddyVerbruggen/cordova-plugin-googleplus)
@@ -50,6 +57,7 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
     public static final String ACTION_LOGOUT = "logout";
     public static final String ACTION_DISCONNECT = "disconnect";
     public static final String ACTION_GET_SIGNING_CERTIFICATE_FINGERPRINT = "getSigningCertificateFingerprint";
+    public static final String ACTION_CREATE_FILE = "createFile";
 
     private final static String FIELD_ACCESS_TOKEN      = "accessToken";
     private final static String FIELD_TOKEN_EXPIRES     = "expires";
@@ -106,6 +114,11 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
         } else if (ACTION_DISCONNECT.equals(action)) {
             Log.i(TAG, "Trying to disconnect the user");
             disconnect();
+
+        } else if (ACTION_CREATE_FILE.equals(action)) {
+            Log.i(TAG, "Trying to create file");
+            cordova.setActivityResultCallback(this);
+            createFile();
 
         } else if (ACTION_GET_SIGNING_CERTIFICATE_FINGERPRINT.equals(action)) {
             getSigningCertificateFingerprint();
@@ -178,8 +191,8 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
         Log.i(TAG, "Building GoogleApiClient");
 
         GoogleApiClient.Builder builder = new GoogleApiClient.Builder(webView.getContext())
-            .addOnConnectionFailedListener(this)
-            .addApi(Auth.GOOGLE_SIGN_IN_API, gso.build());
+                .addOnConnectionFailedListener(this)
+                .addApi(Auth.GOOGLE_SIGN_IN_API, gso.build());
 
         this.mGoogleApiClient = builder.build();
 
@@ -264,6 +277,50 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
     }
 
     /**
+     * Create Files
+     */
+    private void createFile(){
+        ConnectionResult apiConnect =  mGoogleApiClient.blockingConnect();
+
+        if (apiConnect.isSuccess()) {
+            GoogleSignInResult googleSignInResult = Auth.GoogleSignInApi.silentSignIn(this.mGoogleApiClient).await();
+            if(googleSignInResult.isSuccess()) {
+                JSONObject accessTokenBundle = null;
+                try {
+                    accessTokenBundle = getAuthToken(
+                            cordova.getActivity(),  googleSignInResult.getSignInAccount().getAccount(), true
+                    );
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                String accessToken = null;
+                try {
+                    accessToken = (String)accessTokenBundle.get(FIELD_ACCESS_TOKEN);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+                Log.i(TAG,"Access Token : " + accessToken);
+                Log.i(TAG,"getGrantedScopes : " + googleSignInResult.getSignInAccount().getGrantedScopes());
+                Log.i(TAG,"getEmail : " + googleSignInResult.getSignInAccount().getEmail());
+                Log.i(TAG,"getServerAuthCode : " + googleSignInResult.getSignInAccount().getServerAuthCode());
+
+                GoogleCredential credential = new GoogleCredential().setAccessToken(accessToken);
+
+                try {
+                    List<File> files = GoogleDrive.listFiles(credential);
+                    JSONArray array = new JSONArray(new Gson().toJson(files));
+
+                    savedCallbackContext.success(array);
+                } catch (GeneralSecurityException | JSONException | IOException e) {
+                    e.printStackTrace();
+                }
+            } else {
+                Log.i(TAG,"Failed Silent signed in");
+            }
+        }
+    }
+
+    /**
      * Handles failure in connecting to google apis.
      *
      * @param result is the ConnectionResult to potentially catch
@@ -324,8 +381,8 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
         }
 
         if (signInResult == null) {
-          savedCallbackContext.error("SignInResult is null");
-          return;
+            savedCallbackContext.error("SignInResult is null");
+            return;
         }
 
         Log.i(TAG, "Handling SignIn Result");
@@ -343,7 +400,7 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
                     JSONObject result = new JSONObject();
                     try {
                         JSONObject accessTokenBundle = getAuthToken(
-                            cordova.getActivity(), acct.getAccount(), true
+                                cordova.getActivity(), acct.getAccount(), true
                         );
                         result.put(FIELD_ACCESS_TOKEN, accessTokenBundle.get(FIELD_ACCESS_TOKEN));
                         result.put(FIELD_TOKEN_EXPIRES, accessTokenBundle.get(FIELD_TOKEN_EXPIRES));
@@ -416,11 +473,11 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
     }
 
     private JSONObject verifyToken(String authToken) throws IOException, JSONException {
-        URL url = new URL(VERIFY_TOKEN_URL+authToken);
+        URL url = new URL(VERIFY_TOKEN_URL + authToken);
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setInstanceFollowRedirects(true);
         String stringResponse = fromStream(
-            new BufferedInputStream(urlConnection.getInputStream())
+                new BufferedInputStream(urlConnection.getInputStream())
         );
         /* expecting:
         {
@@ -434,7 +491,7 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
 
         Log.d("AuthenticatedBackend", "token: " + authToken + ", verification: " + stringResponse);
         JSONObject jsonResponse = new JSONObject(
-            stringResponse
+                stringResponse
         );
         int expires_in = jsonResponse.getInt(FIELD_TOKEN_EXPIRES_IN);
         if (expires_in < KAssumeStaleTokenSec) {
