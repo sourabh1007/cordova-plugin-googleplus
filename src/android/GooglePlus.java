@@ -41,7 +41,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.util.List;
 
@@ -277,6 +276,36 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
     }
 
     /**
+     * List Files
+     */
+    private void listFiles(){
+        ConnectionResult apiConnect =  mGoogleApiClient.blockingConnect();
+
+        if (apiConnect.isSuccess()) {
+            GoogleSignInResult googleSignInResult = Auth.GoogleSignInApi.silentSignIn(this.mGoogleApiClient).await();
+
+            if(googleSignInResult.isSuccess()) {
+                try {
+                    JSONObject accessTokenBundle = getAuthToken(
+                            cordova.getActivity(),  googleSignInResult.getSignInAccount().getAccount(), true
+                    );
+                    String accessToken = (String)accessTokenBundle.get(FIELD_ACCESS_TOKEN);
+                    GoogleCredential credential = new GoogleCredential().setAccessToken(accessToken);
+                    List<File> files = GoogleDrive.listFiles(credential);
+                    JSONArray array = new JSONArray(new Gson().toJson(files));
+                    savedCallbackContext.success(array);
+                } catch (JSONException | IOException e) {
+                    e.printStackTrace();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            } else {
+                Log.i(TAG,"Failed Silent signed in");
+            }
+        }
+    }
+
+    /**
      * Create Files
      */
     private void createFile(){
@@ -284,34 +313,19 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
 
         if (apiConnect.isSuccess()) {
             GoogleSignInResult googleSignInResult = Auth.GoogleSignInApi.silentSignIn(this.mGoogleApiClient).await();
+
             if(googleSignInResult.isSuccess()) {
-                JSONObject accessTokenBundle = null;
                 try {
-                    accessTokenBundle = getAuthToken(
+                    JSONObject accessTokenBundle = getAuthToken(
                             cordova.getActivity(),  googleSignInResult.getSignInAccount().getAccount(), true
                     );
+                    String accessToken = (String)accessTokenBundle.get(FIELD_ACCESS_TOKEN);
+                    GoogleCredential credential = new GoogleCredential().setAccessToken(accessToken);
+                    GoogleDrive.createFile(credential);
+                    savedCallbackContext.success();
+                } catch (JSONException | IOException e) {
+                    e.printStackTrace();
                 } catch (Exception e) {
-                    e.printStackTrace();
-                }
-                String accessToken = null;
-                try {
-                    accessToken = (String)accessTokenBundle.get(FIELD_ACCESS_TOKEN);
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
-                Log.i(TAG,"Access Token : " + accessToken);
-                Log.i(TAG,"getGrantedScopes : " + googleSignInResult.getSignInAccount().getGrantedScopes());
-                Log.i(TAG,"getEmail : " + googleSignInResult.getSignInAccount().getEmail());
-                Log.i(TAG,"getServerAuthCode : " + googleSignInResult.getSignInAccount().getServerAuthCode());
-
-                GoogleCredential credential = new GoogleCredential().setAccessToken(accessToken);
-
-                try {
-                    List<File> files = GoogleDrive.listFiles(credential);
-                    JSONArray array = new JSONArray(new Gson().toJson(files));
-
-                    savedCallbackContext.success(array);
-                } catch (GeneralSecurityException | JSONException | IOException e) {
                     e.printStackTrace();
                 }
             } else {
