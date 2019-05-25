@@ -43,6 +43,9 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
 import java.util.List;
+import java.util.Map;
+
+import static nl.xservices.plugins.Constants.*;
 
 /**
  * Originally written by Eddy Verbruggen (http://github.com/EddyVerbruggen/cordova-plugin-googleplus)
@@ -50,28 +53,7 @@ import java.util.List;
  */
 public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConnectionFailedListener {
 
-    public static final String ACTION_IS_AVAILABLE = "isAvailable";
-    public static final String ACTION_LOGIN = "login";
-    public static final String ACTION_TRY_SILENT_LOGIN = "trySilentLogin";
-    public static final String ACTION_LOGOUT = "logout";
-    public static final String ACTION_DISCONNECT = "disconnect";
-    public static final String ACTION_GET_SIGNING_CERTIFICATE_FINGERPRINT = "getSigningCertificateFingerprint";
-    public static final String ACTION_CREATE_FILE = "createFile";
-
-    private final static String FIELD_ACCESS_TOKEN      = "accessToken";
-    private final static String FIELD_TOKEN_EXPIRES     = "expires";
-    private final static String FIELD_TOKEN_EXPIRES_IN  = "expires_in";
-    private final static String VERIFY_TOKEN_URL        = "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=";
-
-    //String options/config object names passed in to login and trySilentLogin
-    public static final String ARGUMENT_WEB_CLIENT_ID = "webClientId";
-    public static final String ARGUMENT_SCOPES = "scopes";
-    public static final String ARGUMENT_OFFLINE_KEY = "offline";
-    public static final String ARGUMENT_HOSTED_DOMAIN = "hostedDomain";
-
-    public static final String TAG = "GooglePlugin";
-    public static final int RC_GOOGLEPLUS = 1552; // Request Code to identify our plugin's activities
-    public static final int KAssumeStaleTokenSec = 60;
+    String TAG = "GooglePlus";
 
     // Wraps our service connection to Google Play services and provides access to the users sign in state and Google APIs
     private GoogleApiClient mGoogleApiClient;
@@ -93,7 +75,6 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
         } else if (ACTION_LOGIN.equals(action)) {
             //pass args into api client build
             buildGoogleApiClient(args.optJSONObject(0));
-
             // Tries to Log the user in
             Log.i(TAG, "Trying to Log in!");
             cordova.setActivityResultCallback(this); //sets this class instance to be an activity result listener
@@ -102,7 +83,6 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
         } else if (ACTION_TRY_SILENT_LOGIN.equals(action)) {
             //pass args into api client build
             buildGoogleApiClient(args.optJSONObject(0));
-
             Log.i(TAG, "Trying to do silent login!");
             trySilentLogin();
 
@@ -117,7 +97,43 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
         } else if (ACTION_CREATE_FILE.equals(action)) {
             Log.i(TAG, "Trying to create file");
             cordova.setActivityResultCallback(this);
-            createFile();
+            try {
+                createFile();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            Log.i(TAG, args.getArrayBuffer(0).toString());
+        } else if (ACTION_CREATE_FOLDER.equals(action)) {
+            Log.i(TAG, "Trying to create folder");
+            try {
+                createEmptyFolder(args);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+        } else if (ACTION_LIST_FILES.equals(action)) {
+            Log.i(TAG, "Trying to create folder");
+            try {
+                listFiles();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+        } else if (ACTION_DELETE_FILES.equals(action)) {
+            Log.i(TAG, "Trying to create folder");
+            try {
+                deleteFile();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+        } else if (ACTION_DELETE_FOLDER.equals(action)) {
+            Log.i(TAG, "Trying to create folder");
+            try {
+                deleteFolder();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
 
         } else if (ACTION_GET_SIGNING_CERTIFICATE_FINGERPRINT.equals(action)) {
             getSigningCertificateFingerprint();
@@ -190,8 +206,8 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
         Log.i(TAG, "Building GoogleApiClient");
 
         GoogleApiClient.Builder builder = new GoogleApiClient.Builder(webView.getContext())
-                .addOnConnectionFailedListener(this)
-                .addApi(Auth.GOOGLE_SIGN_IN_API, gso.build());
+            .addOnConnectionFailedListener(this)
+            .addApi(Auth.GOOGLE_SIGN_IN_API, gso.build());
 
         this.mGoogleApiClient = builder.build();
 
@@ -276,9 +292,11 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
     }
 
     /**
-     * List Files
+     * getting google credentials
+     * @return
+     * @throws
      */
-    private void listFiles(){
+    private GoogleCredential googleAPICredentials() throws Exception {
         ConnectionResult apiConnect =  mGoogleApiClient.blockingConnect();
 
         if (apiConnect.isSuccess()) {
@@ -290,10 +308,8 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
                             cordova.getActivity(),  googleSignInResult.getSignInAccount().getAccount(), true
                     );
                     String accessToken = (String)accessTokenBundle.get(FIELD_ACCESS_TOKEN);
-                    GoogleCredential credential = new GoogleCredential().setAccessToken(accessToken);
-                    List<File> files = GoogleDrive.listFiles(credential);
-                    JSONArray array = new JSONArray(new Gson().toJson(files));
-                    savedCallbackContext.success(array);
+                    return new GoogleCredential().setAccessToken(accessToken);
+
                 } catch (JSONException | IOException e) {
                     e.printStackTrace();
                 } catch (Exception e) {
@@ -301,39 +317,59 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
                 }
             } else {
                 Log.i(TAG,"Failed Silent signed in");
+                throw new Exception("Failed Silent signed in because googleSignInResult is failed");
             }
+        } else {
+            throw new Exception("Failed Silent signed in because apiConnect is failed");
         }
+        return null;
+    }
+
+    /**
+     * List Files
+     */
+    private void listFiles() throws Exception {
+        Log.i(TAG,"Fetching file list............");
+        List<File> files = GoogleDrive.listFiles(googleAPICredentials());
+        JSONArray array = new JSONArray(new Gson().toJson(files));
+        savedCallbackContext.success(array);
     }
 
     /**
      * Create Files
      */
-    private void createFile(){
-        ConnectionResult apiConnect =  mGoogleApiClient.blockingConnect();
-
-        if (apiConnect.isSuccess()) {
-            GoogleSignInResult googleSignInResult = Auth.GoogleSignInApi.silentSignIn(this.mGoogleApiClient).await();
-
-            if(googleSignInResult.isSuccess()) {
-                try {
-                    JSONObject accessTokenBundle = getAuthToken(
-                            cordova.getActivity(),  googleSignInResult.getSignInAccount().getAccount(), true
-                    );
-                    String accessToken = (String)accessTokenBundle.get(FIELD_ACCESS_TOKEN);
-                    GoogleCredential credential = new GoogleCredential().setAccessToken(accessToken);
-                    GoogleDrive.createFile(credential);
-                    savedCallbackContext.success();
-                } catch (JSONException | IOException e) {
-                    e.printStackTrace();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            } else {
-                Log.i(TAG,"Failed Silent signed in");
-            }
-        }
+    private void createFile() throws Exception {
+        Log.i(TAG,"Creating a file............");
+        GoogleDrive.createSheet(googleAPICredentials());
+        savedCallbackContext.success();
     }
 
+    /**
+     * Create Empty Folder
+     */
+    private void createEmptyFolder(CordovaArgs args) throws Exception {
+        Log.i(TAG,"Creating an Empty Folder............");
+        GoogleDrive.createFolder(googleAPICredentials(), args);
+        savedCallbackContext.success();
+    }
+
+    /**
+     * Delete File
+     */
+    private void deleteFile() throws Exception {
+        Log.i(TAG, "Deleting file...........");
+        GoogleDrive.deleteFile(googleAPICredentials());
+        savedCallbackContext.success();
+    }
+
+    /**
+     * Delete Folder
+     */
+    private void deleteFolder() throws Exception {
+        Log.i(TAG, "Deleting folder...........");
+        GoogleDrive.deleteFolder(googleAPICredentials());
+        savedCallbackContext.success();
+    }
     /**
      * Handles failure in connecting to google apis.
      *
@@ -395,8 +431,8 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
         }
 
         if (signInResult == null) {
-            savedCallbackContext.error("SignInResult is null");
-            return;
+          savedCallbackContext.error("SignInResult is null");
+          return;
         }
 
         Log.i(TAG, "Handling SignIn Result");
@@ -414,7 +450,7 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
                     JSONObject result = new JSONObject();
                     try {
                         JSONObject accessTokenBundle = getAuthToken(
-                                cordova.getActivity(), acct.getAccount(), true
+                            cordova.getActivity(), acct.getAccount(), true
                         );
                         result.put(FIELD_ACCESS_TOKEN, accessTokenBundle.get(FIELD_ACCESS_TOKEN));
                         result.put(FIELD_TOKEN_EXPIRES, accessTokenBundle.get(FIELD_TOKEN_EXPIRES));
@@ -491,7 +527,7 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setInstanceFollowRedirects(true);
         String stringResponse = fromStream(
-                new BufferedInputStream(urlConnection.getInputStream())
+            new BufferedInputStream(urlConnection.getInputStream())
         );
         /* expecting:
         {
@@ -505,7 +541,7 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
 
         Log.d("AuthenticatedBackend", "token: " + authToken + ", verification: " + stringResponse);
         JSONObject jsonResponse = new JSONObject(
-                stringResponse
+            stringResponse
         );
         int expires_in = jsonResponse.getInt(FIELD_TOKEN_EXPIRES_IN);
         if (expires_in < KAssumeStaleTokenSec) {
