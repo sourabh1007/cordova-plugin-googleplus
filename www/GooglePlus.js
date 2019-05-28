@@ -25,6 +25,22 @@ GooglePlus.prototype.createFile = function (options, successCallback, errorCallb
   cordova.exec(successCallback, errorCallback, "GooglePlus", "createFile", [options]);
 };
 
+GooglePlus.prototype.createFolder = function (options, successCallback, errorCallback) {
+  cordova.exec(successCallback, errorCallback, "GooglePlus", "createFolder", [options]);
+};
+
+GooglePlus.prototype.listFiles = function (options, successCallback, errorCallback) {
+  cordova.exec(successCallback, errorCallback, "GooglePlus", "listFiles", [options]);
+};
+
+GooglePlus.prototype.deleteFile = function (options, successCallback, errorCallback) {
+  cordova.exec(successCallback, errorCallback, "GooglePlus", "deleteFile", [options]);
+};
+
+GooglePlus.prototype.deleteFolder = function (options, successCallback, errorCallback) {
+  cordova.exec(successCallback, errorCallback, "GooglePlus", "deleteFolder", [options]);
+};
+
 GooglePlus.prototype.getSigningCertificateFingerprint = function (successCallback, errorCallback) {
   cordova.exec(successCallback, errorCallback, "GooglePlus", "getSigningCertificateFingerprint", []);
 };

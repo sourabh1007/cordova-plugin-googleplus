@@ -43,7 +43,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
 import java.util.List;
-import java.util.Map;
 
 import static nl.xservices.plugins.Constants.*;
 
@@ -67,6 +66,7 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
     @Override
     public boolean execute(String action, CordovaArgs args, CallbackContext callbackContext) throws JSONException {
         this.savedCallbackContext = callbackContext;
+        JSONObject jsonArgs = args.optJSONObject(0);
 
         if (ACTION_IS_AVAILABLE.equals(action)) {
             final boolean avail = true;
@@ -100,39 +100,34 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
             try {
                 createFile();
             } catch (Exception e) {
-                e.printStackTrace();
+                Log.i(TAG, "Error in createfile");
+                Log.e(TAG, e.getMessage());
             }
-            Log.i(TAG, args.getArrayBuffer(0).toString());
         } else if (ACTION_CREATE_FOLDER.equals(action)) {
-            Log.i(TAG, "Trying to create folder");
+            Log.i(TAG, "Trying to create folder " + new Gson().toJson(jsonArgs));
             try {
-                createEmptyFolder(args);
+                createFolder(jsonArgs);
             } catch (Exception e) {
-                e.printStackTrace();
+                Log.i(TAG, "Error in createFolder");
+                Log.e(TAG, e.getMessage());
             }
 
         } else if (ACTION_LIST_FILES.equals(action)) {
-            Log.i(TAG, "Trying to create folder");
+            Log.i(TAG, "Trying to list files");
             try {
                 listFiles();
             } catch (Exception e) {
-                e.printStackTrace();
+                Log.i(TAG, "Error in listFiles");
+                Log.e(TAG, e.getMessage());
             }
 
-        } else if (ACTION_DELETE_FILES.equals(action)) {
-            Log.i(TAG, "Trying to create folder");
+        } else if (ACTION_DELETE_FILES.equals(action) || ACTION_DELETE_FOLDER.equals(action)) {
+            Log.i(TAG, "Trying to delete file/folder");
             try {
                 deleteFile();
             } catch (Exception e) {
-                e.printStackTrace();
-            }
-
-        } else if (ACTION_DELETE_FOLDER.equals(action)) {
-            Log.i(TAG, "Trying to create folder");
-            try {
-                deleteFolder();
-            } catch (Exception e) {
-                e.printStackTrace();
+                Log.i(TAG, "Error in deleteFile");
+                Log.e(TAG, e.getMessage());
             }
 
         } else if (ACTION_GET_SIGNING_CERTIFICATE_FINGERPRINT.equals(action)) {
@@ -206,8 +201,8 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
         Log.i(TAG, "Building GoogleApiClient");
 
         GoogleApiClient.Builder builder = new GoogleApiClient.Builder(webView.getContext())
-            .addOnConnectionFailedListener(this)
-            .addApi(Auth.GOOGLE_SIGN_IN_API, gso.build());
+                .addOnConnectionFailedListener(this)
+                .addApi(Auth.GOOGLE_SIGN_IN_API, gso.build());
 
         this.mGoogleApiClient = builder.build();
 
@@ -347,9 +342,9 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
     /**
      * Create Empty Folder
      */
-    private void createEmptyFolder(CordovaArgs args) throws Exception {
-        Log.i(TAG,"Creating an Empty Folder............");
-        GoogleDrive.createFolder(googleAPICredentials(), args);
+    private void createFolder(JSONObject configJSON) throws Exception {
+        Log.i(TAG,"Creating Folder............");
+        GoogleDrive.createFolder(googleAPICredentials(), configJSON);
         savedCallbackContext.success();
     }
 
@@ -358,18 +353,10 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
      */
     private void deleteFile() throws Exception {
         Log.i(TAG, "Deleting file...........");
-        GoogleDrive.deleteFile(googleAPICredentials());
+        GoogleDrive.deleteFileOrFolder(googleAPICredentials());
         savedCallbackContext.success();
     }
 
-    /**
-     * Delete Folder
-     */
-    private void deleteFolder() throws Exception {
-        Log.i(TAG, "Deleting folder...........");
-        GoogleDrive.deleteFolder(googleAPICredentials());
-        savedCallbackContext.success();
-    }
     /**
      * Handles failure in connecting to google apis.
      *
@@ -431,8 +418,8 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
         }
 
         if (signInResult == null) {
-          savedCallbackContext.error("SignInResult is null");
-          return;
+            savedCallbackContext.error("SignInResult is null");
+            return;
         }
 
         Log.i(TAG, "Handling SignIn Result");
@@ -450,7 +437,7 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
                     JSONObject result = new JSONObject();
                     try {
                         JSONObject accessTokenBundle = getAuthToken(
-                            cordova.getActivity(), acct.getAccount(), true
+                                cordova.getActivity(), acct.getAccount(), true
                         );
                         result.put(FIELD_ACCESS_TOKEN, accessTokenBundle.get(FIELD_ACCESS_TOKEN));
                         result.put(FIELD_TOKEN_EXPIRES, accessTokenBundle.get(FIELD_TOKEN_EXPIRES));
@@ -527,7 +514,7 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
         urlConnection.setInstanceFollowRedirects(true);
         String stringResponse = fromStream(
-            new BufferedInputStream(urlConnection.getInputStream())
+                new BufferedInputStream(urlConnection.getInputStream())
         );
         /* expecting:
         {
@@ -541,7 +528,7 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
 
         Log.d("AuthenticatedBackend", "token: " + authToken + ", verification: " + stringResponse);
         JSONObject jsonResponse = new JSONObject(
-            stringResponse
+                stringResponse
         );
         int expires_in = jsonResponse.getInt(FIELD_TOKEN_EXPIRES_IN);
         if (expires_in < KAssumeStaleTokenSec) {

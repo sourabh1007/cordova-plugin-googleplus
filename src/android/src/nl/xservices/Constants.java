@@ -1,11 +1,12 @@
 package nl.xservices.plugins;
 
+import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
 
 public interface Constants {
 
-    String APPLICATION_NAME     = "Investo";
+    String APPLICATION_NAME     = "MyApp";
 
     String ACTION_IS_AVAILABLE  = "isAvailable";
     String ACTION_LOGIN         = "login";
@@ -35,4 +36,5 @@ public interface Constants {
     int KAssumeStaleTokenSec    = 60;
 
     JsonFactory JSON_FACTORY    = JacksonFactory.getDefaultInstance();
+    NetHttpTransport HTTP_TRANSPORT = new com.google.api.client.http.javanet.NetHttpTransport();
 }

@@ -19,8 +19,8 @@
   <issue>https://github.com/sourabh1007/cordova-plugin-googleplus/issues</issue>
 
   <engines>
-    <engine name="cordova" version=">=7.1.0"/>
-    <engine name="cordova-android" version=">=6.3.0"/>
+    <engine name="cordova" version=">=8.0.0"/>
+    <engine name="cordova-android" version=">=8.0.0"/>
   </engines>
 
   <js-module src="www/GooglePlus.js" name="GooglePlus">
@@ -29,13 +29,11 @@
 
   <!-- android -->
   <platform name="android">
-
-	<preference name="PLAY_SERVICES_VERSION" default="11.8.0"/>
-    <framework src="com.google.android.gms:play-services-auth:16.0.0" />
+    <framework src="com.google.android.gms:play-services-auth:16.0.1" />
     <framework src="com.google.android.gms:play-services-identity:16.0.0" />
     <framework src="com.google.apis:google-api-services-drive:v3-rev110-1.23.0" />
-    <framework src="com.google.http-client:google-http-client-gson:1.23.0" />
     <framework src="com.google.apis:google-api-services-sheets:v4-rev516-1.23.0" />
+    <framework src="com.google.http-client:google-http-client-gson:1.23.0" />
 
     <config-file target="res/xml/config.xml" parent="/*">
       <feature name="GooglePlus">
