@@ -3,6 +3,7 @@ package nl.xservices.plugins;
 import android.util.Log;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
+import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.model.File;
 import com.google.api.services.drive.model.FileList;
@@ -14,6 +15,8 @@ import com.google.gson.Gson;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,9 +26,9 @@ public class GoogleDrive {
 
     public static final String TAG = "GoogleDrive";
 
-    public static List<File> listFiles(GoogleCredential credential) {
+    public static List<File> listFiles(GoogleCredential credential) throws GeneralSecurityException, IOException {
 
-        Drive service = new Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
+        Drive service = new Drive.Builder(GoogleNetHttpTransport.newTrustedTransport(), JSON_FACTORY, credential)
                 .setApplicationName(APPLICATION_NAME)
                 .build();
         List<File> files = new ArrayList<>();
@@ -45,10 +48,10 @@ public class GoogleDrive {
 
     }
 
-    public static void createSheet(GoogleCredential credential) {
+    public static void createSheet(GoogleCredential credential) throws GeneralSecurityException, IOException {
         Log.i(TAG,"Triggering Create File.....");
 
-        Sheets service = new Sheets.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
+        Sheets service = new Sheets.Builder(GoogleNetHttpTransport.newTrustedTransport(), JSON_FACTORY, credential)
                 .setApplicationName(APPLICATION_NAME)
                 .build();
 
@@ -66,10 +69,10 @@ public class GoogleDrive {
         Log.i(TAG,"Spreadsheet ID: " + spreadsheet.getSpreadsheetId());
     }
 
-    public static void createFile(GoogleCredential credential, JSONObject configJSON) {
+    public static void createFile(GoogleCredential credential, JSONObject configJSON) throws GeneralSecurityException, IOException {
         Log.i(TAG,"Triggering Create File...." + new Gson().toJson(configJSON));
 
-        Drive service = new Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
+        Drive service = new Drive.Builder(GoogleNetHttpTransport.newTrustedTransport(), JSON_FACTORY, credential)
                 .setApplicationName(APPLICATION_NAME)
                 .build();
         try {
@@ -96,7 +99,7 @@ public class GoogleDrive {
             if(null == folderName || folderName.isEmpty()) {
                 folderName = APPLICATION_NAME;
             }
-            Drive service = new Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
+            Drive service = new Drive.Builder(GoogleNetHttpTransport.newTrustedTransport(), JSON_FACTORY, credential)
                     .setApplicationName(APPLICATION_NAME)
                     .build();
 
@@ -122,7 +125,7 @@ public class GoogleDrive {
     public static void deleteFileOrFolder(GoogleCredential credential) {
 
         try {
-            Drive service = new Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
+            Drive service = new Drive.Builder(GoogleNetHttpTransport.newTrustedTransport(), JSON_FACTORY, credential)
                     .setApplicationName(APPLICATION_NAME)
                     .build();
             service.files().delete("").execute();
