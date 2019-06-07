@@ -72,7 +72,9 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
             final boolean avail = true;
             savedCallbackContext.success("" + avail);
 
-        } else if (ACTION_LOGIN.equals(action)) {
+        }
+        else
+        if (ACTION_LOGIN.equals(action)) {
             //pass args into api client build
             buildGoogleApiClient(args.optJSONObject(0));
             // Tries to Log the user in
@@ -80,30 +82,50 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
             cordova.setActivityResultCallback(this); //sets this class instance to be an activity result listener
             signIn();
 
-        } else if (ACTION_TRY_SILENT_LOGIN.equals(action)) {
+        }
+        else
+        if (ACTION_TRY_SILENT_LOGIN.equals(action)) {
             //pass args into api client build
             buildGoogleApiClient(args.optJSONObject(0));
             Log.i(TAG, "Trying to do silent login!");
             trySilentLogin();
 
-        } else if (ACTION_LOGOUT.equals(action)) {
+        }
+        else
+        if (ACTION_LOGOUT.equals(action)) {
             Log.i(TAG, "Trying to logout!");
             signOut();
 
-        } else if (ACTION_DISCONNECT.equals(action)) {
+        }
+        else
+        if (ACTION_DISCONNECT.equals(action)) {
             Log.i(TAG, "Trying to disconnect the user");
             disconnect();
 
-        } else if (ACTION_CREATE_FILE.equals(action)) {
+        }
+        else
+        if (ACTION_CREATE_FILE.equals(action)) {
             Log.i(TAG, "Trying to create file");
             cordova.setActivityResultCallback(this);
             try {
-                createFile();
+                createFile(jsonArgs);
             } catch (Exception e) {
                 Log.i(TAG, "Error in createfile");
                 Log.e(TAG, e.getMessage());
             }
-        } else if (ACTION_CREATE_FOLDER.equals(action)) {
+        }
+        else
+        if (ACTION_CREATE_SHEET.equals(action)) {
+            Log.i(TAG, "Trying to create sheet ");
+            try {
+                createSheet(jsonArgs);
+            } catch (Exception e) {
+                Log.i(TAG, "Error in createSheet");
+                Log.e(TAG, e.getMessage());
+            }
+        }
+        else
+        if (ACTION_CREATE_FOLDER.equals(action)) {
             Log.i(TAG, "Trying to create folder " + new Gson().toJson(jsonArgs));
             try {
                 createFolder(jsonArgs);
@@ -112,7 +134,9 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
                 Log.e(TAG, e.getMessage());
             }
 
-        } else if (ACTION_LIST_FILES.equals(action)) {
+        }
+        else
+        if (ACTION_LIST_FILES.equals(action)) {
             Log.i(TAG, "Trying to list files");
             try {
                 listFiles();
@@ -121,7 +145,9 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
                 Log.e(TAG, e.getMessage());
             }
 
-        } else if (ACTION_DELETE_FILES.equals(action) || ACTION_DELETE_FOLDER.equals(action)) {
+        }
+        else
+        if (ACTION_DELETE_FILES.equals(action) || ACTION_DELETE_FOLDER.equals(action)) {
             Log.i(TAG, "Trying to delete file/folder");
             try {
                 deleteFile();
@@ -130,13 +156,16 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
                 Log.e(TAG, e.getMessage());
             }
 
-        } else if (ACTION_GET_SIGNING_CERTIFICATE_FINGERPRINT.equals(action)) {
+        }
+        else
+        if (ACTION_GET_SIGNING_CERTIFICATE_FINGERPRINT.equals(action)) {
             getSigningCertificateFingerprint();
 
-        } else {
+        }
+        else
+        {
             Log.i(TAG, "This action doesn't exist");
             return false;
-
         }
         return true;
     }
@@ -333,9 +362,9 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
     /**
      * Create Files
      */
-    private void createFile() throws Exception {
+    private void createFile(JSONObject configJSON) throws Exception {
         Log.i(TAG,"Creating a file............");
-        GoogleDrive.createSheet(googleAPICredentials());
+        GoogleDrive.createFile(googleAPICredentials(), configJSON);
         savedCallbackContext.success();
     }
 
@@ -345,6 +374,17 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
     private void createFolder(JSONObject configJSON) throws Exception {
         Log.i(TAG,"Creating Folder............");
         GoogleDrive.createFolder(googleAPICredentials(), configJSON);
+        savedCallbackContext.success();
+    }
+
+    /**
+     * Create Empty Sheet
+     * @param configJSON
+     * @throws
+     */
+    private void createSheet(JSONObject configJSON) throws Exception {
+        Log.i(TAG,"Creating Folder............");
+        GoogleDrive.createSheet(googleAPICredentials(), configJSON);
         savedCallbackContext.success();
     }
 

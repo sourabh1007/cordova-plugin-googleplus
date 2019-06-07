@@ -3,6 +3,7 @@ package nl.xservices.plugins;
 import android.util.Log;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
+import com.google.api.client.http.FileContent;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.model.File;
 import com.google.api.services.drive.model.FileList;
@@ -11,26 +12,186 @@ import com.google.api.services.sheets.v4.model.Spreadsheet;
 import com.google.api.services.sheets.v4.model.SpreadsheetProperties;
 import com.google.gson.Gson;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
-import static nl.xservices.plugins.Constants.*;
+import static nl.xservices.plugins.Constants.APPLICATION_NAME;
+import static nl.xservices.plugins.Constants.HTTP_TRANSPORT;
+import static nl.xservices.plugins.Constants.JSON_FACTORY;
+import static nl.xservices.plugins.Constants.MIME_TYPE_FOLDER;
+import static nl.xservices.plugins.Constants.MIME_TYPE_GOOGLE_SHEET;
+import static nl.xservices.plugins.Constants.MIME_TYPE_TEXT_PLAIN;
 
 public class GoogleDrive {
 
     public static final String TAG = "GoogleDrive";
 
-    public static List<File> listFiles(GoogleCredential credential) {
-
-        Drive service = new Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
+    private static Drive createDriveService(GoogleCredential credential) {
+        return new Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
                 .setApplicationName(APPLICATION_NAME)
                 .build();
+    }
+
+    private static Sheets createSheetsService(GoogleCredential credential) {
+        return new Sheets.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
+                .setApplicationName(APPLICATION_NAME)
+                .build();
+    }
+
+    private static boolean isFolderExists(GoogleCredential credential, String folderName)
+            throws IOException {
+        Log.i(TAG,"Checking if folder exists : folderName : " + folderName);
+
+        FileList folderList = createDriveService(credential).files().list().setQ(
+                "mimeType='application/vnd.google-apps.folder' and trashed=false and name='" + folderName+"'").execute();
+
+        Log.i(TAG, "folderList.size() " + folderList.getFiles().size());
+        return !folderList.getFiles().isEmpty();
+    }
+
+    /**
+     * Create Functions
+     * @param credential
+     */
+    public static String createFile  (GoogleCredential credential, JSONObject configJSON) {
+        Log.i(TAG,"Triggering Create File...." + new Gson().toJson(configJSON));
+
+        try {
+            String filename = configJSON.getString("name");
+            Log.i(TAG, "filename : " + filename);
+            String fileType = MIME_TYPE_TEXT_PLAIN;
+            if(configJSON.has("type")) {
+                fileType = configJSON.getString("type");
+                if(MIME_TYPE_GOOGLE_SHEET.equals(fileType)) {
+                    return createSheet(credential, configJSON);
+                }
+            }
+            Log.i(TAG, "fileType : " + fileType);
+            String parentFolderId = configJSON.getString("parentFolderId");
+            Log.i(TAG, "parentFolderId : " + parentFolderId);
+
+            File fileMetadata = new File();
+            fileMetadata.setName(filename);
+            if(null != parentFolderId && !parentFolderId.isEmpty())
+                fileMetadata.setParents(Collections.singletonList(parentFolderId));
+
+            FileContent mediaContent = new FileContent(fileType,
+                    java.io.File.createTempFile(filename + "-tmp", "config"));
+            File file = createDriveService(credential).files().create(fileMetadata, mediaContent)
+                    .setFields("id, parents")
+                    .execute();
+
+            Log.i(TAG,"File ID: " + file.getId());
+            return file.getId();
+
+        } catch (Exception ex) {
+            Log.e(TAG,ex.getMessage());
+            return null;
+        }
+    }
+
+    public static String createFolder(GoogleCredential credential, JSONObject folderConfig) {
+        Log.i(TAG,"Triggering Create Folder....." + new Gson().toJson(folderConfig));
+        String folderId;
+        try {
+            String folderName = folderConfig.getString("name");
+            if(null == folderName || folderName.isEmpty()) {
+                folderName = APPLICATION_NAME;
+            }
+            String parentFolderId = null;
+            if(folderConfig.has("parentFolderId")) {
+                parentFolderId = folderConfig.getString("parentFolderId");
+                Log.i(TAG, "parentFolderId : " + parentFolderId);
+            }
+
+            if(!isFolderExists(credential, folderName)) {
+                Log.i(TAG,"folderName....." + folderName + " NOT found so creating it");
+                File folderMetadata = new File();
+                folderMetadata.setMimeType(MIME_TYPE_FOLDER);
+                folderMetadata.setName(folderName);
+                if(null != parentFolderId && !parentFolderId.isEmpty())
+                    folderMetadata.setParents(Collections.singletonList(parentFolderId));
+
+                File folder = createDriveService(credential).files().create(folderMetadata).execute();
+                folderId = folder.getId();
+                if(folderConfig.has("files")) {
+                    JSONArray fileConfigArray = folderConfig.getJSONArray("files");
+                    for(int fileCount = 0; fileCount < fileConfigArray.length(); fileCount++) {
+                        JSONObject fileConfig = fileConfigArray.getJSONObject(fileCount);
+                        fileConfig.put("parentFolderId", folderId);
+                        createFile(credential, fileConfig);
+                    }
+                    Log.i(TAG,"Created folder successfully with files");
+
+                } else {
+                    Log.i(TAG,"Created folder successfully.");
+                }
+                return folderId;
+            }
+            else {
+                Log.i(TAG,"folderName....." + folderName + " found so skip creating it");
+                return null;
+            }
+        } catch (Exception ex) {
+            Log.e(TAG,ex.getMessage());
+            return null;
+        }
+    }
+
+    public static String createSheet (GoogleCredential credential, JSONObject configJSON) {
+        Log.i(TAG,"Triggering Create File.....");
+        Spreadsheet spreadsheet;
+        try {
+            String filename = configJSON.getString("name");
+            String parentFolderId = configJSON.getString("parentFolderId");
+
+            spreadsheet = new Spreadsheet()
+                    .setProperties(new SpreadsheetProperties().setTitle(filename));
+
+            spreadsheet = createSheetsService(credential).spreadsheets().create(spreadsheet)
+                    .setFields("spreadsheetId")
+                    .execute();
+            moveFile(credential, spreadsheet.getSpreadsheetId(), parentFolderId);
+
+        } catch (Exception ex) {
+            Log.e(TAG,ex.getMessage());
+            return null;
+        }
+
+        Log.i(TAG,"Spreadsheet ID: " + spreadsheet.getSpreadsheetId());
+        return spreadsheet.getSpreadsheetId();
+    }
+
+    private static void moveFile(GoogleCredential credential, String fileId, String newParentFolder) throws IOException {
+        File file = createDriveService(credential).files().get(fileId)
+                .setFields("parents")
+                .execute();
+        StringBuilder previousParents = new StringBuilder();
+        for (String parent : file.getParents()) {
+            previousParents.append(parent);
+            previousParents.append(',');
+        }
+        createDriveService(credential).files().update(fileId,
+                null).setAddParents(newParentFolder).setRemoveParents(previousParents.toString())
+                .setFields("id, parents").execute();
+    }
+
+    /**
+     * List Functions
+     * @param credential
+     * @return
+     */
+    public static List<File> listFiles(GoogleCredential credential) {
+
         List<File> files = new ArrayList<>();
         try {
-            FileList result = service.files().list()
+            FileList result = createDriveService(credential).files().list()
                     .setPageSize(100)
                     .setFields("nextPageToken, files(id, name)")
                     .execute();
@@ -45,93 +206,22 @@ public class GoogleDrive {
 
     }
 
-    public static void createSheet(GoogleCredential credential) {
-        Log.i(TAG,"Triggering Create File.....");
-
-        Sheets service = new Sheets.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
-                .setApplicationName(APPLICATION_NAME)
-                .build();
-
-        Spreadsheet spreadsheet = new Spreadsheet()
-                .setProperties(new SpreadsheetProperties()
-                        .setTitle("my title"));
-        try {
-            spreadsheet = service.spreadsheets().create(spreadsheet)
-                    .setFields("spreadsheetId")
-                    .execute();
-        } catch (Exception ex) {
-            Log.e(TAG,ex.getMessage());
-        }
-
-        Log.i(TAG,"Spreadsheet ID: " + spreadsheet.getSpreadsheetId());
-    }
-
-    public static void createFile(GoogleCredential credential, JSONObject configJSON) {
-        Log.i(TAG,"Triggering Create File...." + new Gson().toJson(configJSON));
-
-        Drive service = new Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
-                .setApplicationName(APPLICATION_NAME)
-                .build();
-        try {
-            String filename = configJSON.getString("name");
-            Log.i(TAG, "filename : " + filename);
-
-            File file = new File()
-                    .setMimeType("application/vnd.google-apps.file")
-                    .setName(filename);
-
-            file = service.files().create(file).execute();
-            Log.i(TAG,"File ID: " + file.getId());
-
-        } catch (Exception ex) {
-            Log.e(TAG,ex.getMessage());
-        }
-    }
-
-    public static void createFolder(GoogleCredential credential, JSONObject folderConfig) {
-        Log.i(TAG,"Triggering Create Folder....." + new Gson().toJson(folderConfig));
-
-        try {
-            String folderName = folderConfig.getString("name");
-            if(null == folderName || folderName.isEmpty()) {
-                folderName = APPLICATION_NAME;
-            }
-            Drive service = new Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
-                    .setApplicationName(APPLICATION_NAME)
-                    .build();
-
-            File folderMetadata = new File();
-            folderMetadata.setMimeType("application/vnd.google-apps.folder");
-            folderMetadata.setName(folderName);
-            service.files().create(folderMetadata).execute();
-
-            try {
-                JSONObject fileConfig = folderConfig.getJSONObject("file");
-                createFile(credential, fileConfig);
-                Log.i(TAG,"Created folder successfully with file");
-
-            } catch (JSONException ex) {
-                Log.i(TAG,"Created folder successfully without file");
-
-            }
-        } catch (Exception ex) {
-            Log.e(TAG,ex.getMessage());
-        }
-    }
-
+    /**
+     * Delete File/Folder
+     * @param credential
+     */
     public static void deleteFileOrFolder(GoogleCredential credential) {
 
         try {
-            Drive service = new Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
-                    .setApplicationName(APPLICATION_NAME)
-                    .build();
-            service.files().delete("").execute();
+            createDriveService(credential).files().delete("").execute();
+
         } catch(Exception ex) {
             Log.e(TAG,ex.getMessage());
-
         }
 
         Log.i(TAG,"Deleted folder Successfully");
     }
+
+
 
 }

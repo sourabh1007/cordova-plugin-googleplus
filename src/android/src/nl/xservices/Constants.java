@@ -14,6 +14,7 @@ public interface Constants {
     String ACTION_DISCONNECT    = "disconnect";
     String ACTION_CREATE_FILE   = "createFile";
     String ACTION_CREATE_FOLDER = "createFolder";
+    String ACTION_CREATE_SHEET  = "createSheet";
     String ACTION_LIST_FILES    = "listFiles";
     String ACTION_DELETE_FILES  = "deleteFile";
     String ACTION_DELETE_FOLDER = "deleteFolder";
@@ -23,6 +24,10 @@ public interface Constants {
     String FIELD_ACCESS_TOKEN      = "accessToken";
     String FIELD_TOKEN_EXPIRES     = "expires";
     String FIELD_TOKEN_EXPIRES_IN  = "expires_in";
+
+    String MIME_TYPE_TEXT_PLAIN     = "text/plain";
+    String MIME_TYPE_GOOGLE_SHEET   = "application/vnd.google-apps.spreadsheet";
+    String MIME_TYPE_FOLDER         = "application/vnd.google-apps.folder";
 
     String VERIFY_TOKEN_URL        = "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=";
 
