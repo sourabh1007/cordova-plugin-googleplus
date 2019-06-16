@@ -8,6 +8,10 @@ import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.model.File;
 import com.google.api.services.drive.model.FileList;
 import com.google.api.services.sheets.v4.Sheets;
+import com.google.api.services.sheets.v4.model.AddSheetRequest;
+import com.google.api.services.sheets.v4.model.BatchUpdateSpreadsheetRequest;
+import com.google.api.services.sheets.v4.model.Request;
+import com.google.api.services.sheets.v4.model.SheetProperties;
 import com.google.api.services.sheets.v4.model.Spreadsheet;
 import com.google.api.services.sheets.v4.model.SpreadsheetProperties;
 import com.google.gson.Gson;
@@ -53,6 +57,21 @@ public class GoogleDrive {
 
         Log.i(TAG, "folderList.size() " + folderList.getFiles().size());
         return !folderList.getFiles().isEmpty();
+    }
+
+    private static void moveFile(GoogleCredential credential, String fileId, String newParentFolder)
+            throws IOException {
+        File file = createDriveService(credential).files().get(fileId)
+                .setFields("parents")
+                .execute();
+        StringBuilder previousParents = new StringBuilder();
+        for (String parent : file.getParents()) {
+            previousParents.append(parent);
+            previousParents.append(',');
+        }
+        createDriveService(credential).files().update(fileId,
+                null).setAddParents(newParentFolder).setRemoveParents(previousParents.toString())
+                .setFields("id, parents").execute();
     }
 
     /**
@@ -151,12 +170,26 @@ public class GoogleDrive {
             String filename = configJSON.getString("name");
             String parentFolderId = configJSON.getString("parentFolderId");
 
+            List<String> tabList = new ArrayList<>();
+            if(configJSON.has("tabs")) {
+                JSONArray tabListinJson = configJSON.getJSONArray("tabs");
+                int tabLength = tabListinJson.length();
+                for(int tabCount = 0; tabCount < tabLength; tabCount++) {
+                    tabList.add(tabListinJson.getString(tabCount));
+                }
+            }
+
             spreadsheet = new Spreadsheet()
                     .setProperties(new SpreadsheetProperties().setTitle(filename));
 
             spreadsheet = createSheetsService(credential).spreadsheets().create(spreadsheet)
                     .setFields("spreadsheetId")
                     .execute();
+
+            if(!tabList.isEmpty()) {
+                addTabs(credential, spreadsheet, tabList);
+            }
+
             moveFile(credential, spreadsheet.getSpreadsheetId(), parentFolderId);
 
         } catch (Exception ex) {
@@ -166,20 +199,6 @@ public class GoogleDrive {
 
         Log.i(TAG,"Spreadsheet ID: " + spreadsheet.getSpreadsheetId());
         return spreadsheet.getSpreadsheetId();
-    }
-
-    private static void moveFile(GoogleCredential credential, String fileId, String newParentFolder) throws IOException {
-        File file = createDriveService(credential).files().get(fileId)
-                .setFields("parents")
-                .execute();
-        StringBuilder previousParents = new StringBuilder();
-        for (String parent : file.getParents()) {
-            previousParents.append(parent);
-            previousParents.append(',');
-        }
-        createDriveService(credential).files().update(fileId,
-                null).setAddParents(newParentFolder).setRemoveParents(previousParents.toString())
-                .setFields("id, parents").execute();
     }
 
     /**
@@ -222,6 +241,25 @@ public class GoogleDrive {
         Log.i(TAG,"Deleted folder Successfully");
     }
 
+    public static void addTabs(GoogleCredential credential, Spreadsheet spreadsheet, List<String> tabs)
+            throws IOException {
+        for(String tabName : tabs) {
+            BatchUpdateSpreadsheetRequest batchUpdateSpreadsheetRequest = new BatchUpdateSpreadsheetRequest();
 
+            AddSheetRequest addSheetReq = new AddSheetRequest();
+            addSheetReq.setProperties(new SheetProperties().setTitle(tabName));
+
+            Request request = new Request();
+            request.setAddSheet(addSheetReq);
+
+            List<Request> reqList  = new ArrayList<>();
+            reqList.add(request);
+
+            batchUpdateSpreadsheetRequest.setRequests(reqList);
+
+            createSheetsService(credential).spreadsheets()
+                    .batchUpdate(spreadsheet.getSpreadsheetId(), batchUpdateSpreadsheetRequest).execute();
+        }
+    }
 
 }
