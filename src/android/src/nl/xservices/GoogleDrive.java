@@ -20,7 +20,9 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -36,14 +38,11 @@ public class GoogleDrive {
 
     public static final String TAG = "GoogleDrive";
 
+    /**
+     * Google Drive APIs
+     */
     private static Drive createDriveService(GoogleCredential credential) {
         return new Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
-                .setApplicationName(APPLICATION_NAME)
-                .build();
-    }
-
-    private static Sheets createSheetsService(GoogleCredential credential) {
-        return new Sheets.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
                 .setApplicationName(APPLICATION_NAME)
                 .build();
     }
@@ -74,10 +73,6 @@ public class GoogleDrive {
                 .setFields("id, parents").execute();
     }
 
-    /**
-     * Create Functions
-     * @param credential
-     */
     public static String createFile  (GoogleCredential credential, JSONObject configJSON) {
         Log.i(TAG,"Triggering Create File...." + new Gson().toJson(configJSON));
 
@@ -163,6 +158,87 @@ public class GoogleDrive {
         }
     }
 
+    public static List<File> listFiles(GoogleCredential credential) {
+
+        List<File> files = new ArrayList<>();
+        try {
+            FileList result = createDriveService(credential).files().list()
+                    .setPageSize(100)
+                    .setFields("nextPageToken, files(id, name)")
+                    .execute();
+            files =  result.getFiles();
+
+            Log.i(TAG, "Number of files found  : " + files.size());
+
+        } catch (Exception ex) {
+            Log.e(TAG,ex.getMessage());
+        }
+        return files;
+
+    }
+
+    public static void deleteFileOrFolder(GoogleCredential credential, JSONObject configJSON) {
+
+        try {
+            String fileid = configJSON.getString("fileid");
+            createDriveService(credential).files().delete(fileid).execute();
+
+        } catch(Exception ex) {
+            Log.e(TAG,ex.getMessage());
+        }
+
+        Log.i(TAG,"Deleted folder Successfully");
+    }
+
+    public static void uploadFile(GoogleCredential credential, JSONObject configJSON) {
+
+        try {
+            java.io.File filePath = (java.io.File) configJSON.get("file");
+            String type = configJSON.getString("type");
+            System.out.println("type: " + type);
+
+            System.out.println("filePath.getName() ------- " + filePath.getName());
+            System.out.println("filePath.toString() ------- " + filePath.toString());
+
+            String fileName = filePath.getName();
+            if (configJSON.has("name")) {
+                fileName = configJSON.getString("name");
+                System.out.println("fileName: " + fileName);
+            }
+
+            String mimeType = configJSON.getString("mimeType");
+            System.out.println("mimeType: " + mimeType);
+            File fileMetadata = new File();
+            fileMetadata.setName(fileName);
+            fileMetadata.setMimeType(mimeType);
+
+            FileContent mediaContent = new FileContent(type, filePath);
+            File file = createDriveService(credential).files().create(fileMetadata, mediaContent)
+                    .setFields("id")
+                    .execute();
+            System.out.println("File ID: " + file.getId());
+        } catch(Exception ex) {
+            System.out.println(ex.getMessage());
+        }
+    }
+
+    public static void downloadFile(GoogleCredential credential, JSONObject configJSON)
+            throws IOException, JSONException {
+        String fileId = configJSON.getString("fileId");
+        OutputStream outputStream = new ByteArrayOutputStream();
+        createDriveService(credential).files().get(fileId)
+                .executeMediaAndDownloadTo(outputStream);
+    }
+
+    /**
+     * Google Sheet APIs
+     */
+    private static Sheets createSheetsService(GoogleCredential credential) {
+        return new Sheets.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
+                .setApplicationName(APPLICATION_NAME)
+                .build();
+    }
+
     public static String createSheet (GoogleCredential credential, JSONObject configJSON) {
         Log.i(TAG,"Triggering Create File.....");
         Spreadsheet spreadsheet;
@@ -201,65 +277,39 @@ public class GoogleDrive {
         return spreadsheet.getSpreadsheetId();
     }
 
-    /**
-     * List Functions
-     * @param credential
-     * @return
-     */
-    public static List<File> listFiles(GoogleCredential credential) {
+    public static void addTabs(GoogleCredential credential, JSONObject configJSON)
+            throws IOException, JSONException {
 
-        List<File> files = new ArrayList<>();
-        try {
-            FileList result = createDriveService(credential).files().list()
-                    .setPageSize(100)
-                    .setFields("nextPageToken, files(id, name)")
-                    .execute();
-            files =  result.getFiles();
-
-            Log.i(TAG, "Number of files found  : " + files.size());
-
-        } catch (Exception ex) {
-            Log.e(TAG,ex.getMessage());
+        List<String> tabList = new ArrayList<>();
+        String spreadsheetId = configJSON.getString("spreadsheetId");
+        JSONArray tabListinJson = configJSON.getJSONArray("tabs");
+        int tabLength = tabListinJson.length();
+        for(int tabCount = 0; tabCount < tabLength; tabCount++) {
+            tabList.add(tabListinJson.getString(tabCount));
         }
-        return files;
+
+        Spreadsheet spreadsheet = createSheetsService(credential).spreadsheets().get(spreadsheetId).execute();
+        addTabs(credential, spreadsheet, tabList);
 
     }
 
-    /**
-     * Delete File/Folder
-     * @param credential
-     */
-    public static void deleteFileOrFolder(GoogleCredential credential) {
-
-        try {
-            createDriveService(credential).files().delete("").execute();
-
-        } catch(Exception ex) {
-            Log.e(TAG,ex.getMessage());
-        }
-
-        Log.i(TAG,"Deleted folder Successfully");
-    }
-
-    public static void addTabs(GoogleCredential credential, Spreadsheet spreadsheet, List<String> tabs)
+    private static void addTabs(GoogleCredential credential, Spreadsheet spreadsheet, List<String> tabs)
             throws IOException {
-        for(String tabName : tabs) {
-            BatchUpdateSpreadsheetRequest batchUpdateSpreadsheetRequest = new BatchUpdateSpreadsheetRequest();
 
+        BatchUpdateSpreadsheetRequest batchUpdateSpreadsheetRequest = new BatchUpdateSpreadsheetRequest();
+        List<Request> reqList  = new ArrayList<>();
+        for(String tabName : tabs) {
             AddSheetRequest addSheetReq = new AddSheetRequest();
             addSheetReq.setProperties(new SheetProperties().setTitle(tabName));
 
             Request request = new Request();
             request.setAddSheet(addSheetReq);
 
-            List<Request> reqList  = new ArrayList<>();
             reqList.add(request);
-
-            batchUpdateSpreadsheetRequest.setRequests(reqList);
-
-            createSheetsService(credential).spreadsheets()
-                    .batchUpdate(spreadsheet.getSpreadsheetId(), batchUpdateSpreadsheetRequest).execute();
         }
-    }
+        batchUpdateSpreadsheetRequest.setRequests(reqList);
 
+        createSheetsService(credential).spreadsheets()
+                .batchUpdate(spreadsheet.getSpreadsheetId(), batchUpdateSpreadsheetRequest).execute();
+    }
 }

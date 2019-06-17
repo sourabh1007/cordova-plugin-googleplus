@@ -125,6 +125,36 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
             }
         }
         else
+        if (ACTION_ADD_TAB_SHEET.equals(action)) {
+            Log.i(TAG, "Trying to add tabs in a sheet ");
+            try {
+                addTabs(jsonArgs);
+            } catch (Exception e) {
+                Log.i(TAG, "Error in add tabs in a sheet");
+                Log.e(TAG, e.getMessage());
+            }
+        }
+        else
+        if (ACTION_UPLOAD_FILE.equals(action)) {
+            Log.i(TAG, "Trying to uploadFile");
+            try {
+                upload(jsonArgs);
+            } catch (Exception e) {
+                Log.i(TAG, "Error in upload");
+                Log.e(TAG, e.getMessage());
+            }
+        }
+        else
+        if (ACTION_DOWNLOAD_FILE.equals(action)) {
+            Log.i(TAG, "Trying to download ");
+            try {
+                download(jsonArgs);
+            } catch (Exception e) {
+                Log.i(TAG, "Error in download");
+                Log.e(TAG, e.getMessage());
+            }
+        }
+        else
         if (ACTION_CREATE_FOLDER.equals(action)) {
             Log.i(TAG, "Trying to create folder " + new Gson().toJson(jsonArgs));
             try {
@@ -150,12 +180,11 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
         if (ACTION_DELETE_FILES.equals(action) || ACTION_DELETE_FOLDER.equals(action)) {
             Log.i(TAG, "Trying to delete file/folder");
             try {
-                deleteFile();
+                deleteFile(jsonArgs);
             } catch (Exception e) {
                 Log.i(TAG, "Error in deleteFile");
                 Log.e(TAG, e.getMessage());
             }
-
         }
         else
         if (ACTION_GET_SIGNING_CERTIFICATE_FINGERPRINT.equals(action)) {
@@ -378,6 +407,15 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
     }
 
     /**
+     * Delete File
+     */
+    private void deleteFile(JSONObject configJSON) throws Exception {
+        Log.i(TAG, "Deleting file...........");
+        GoogleDrive.deleteFileOrFolder(googleAPICredentials(), configJSON);
+        savedCallbackContext.success();
+    }
+
+    /**
      * Create Empty Sheet
      * @param configJSON
      * @throws
@@ -388,12 +426,22 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
         savedCallbackContext.success();
     }
 
-    /**
-     * Delete File
-     */
-    private void deleteFile() throws Exception {
-        Log.i(TAG, "Deleting file...........");
-        GoogleDrive.deleteFileOrFolder(googleAPICredentials());
+
+    private void addTabs(JSONObject configJSON) throws Exception {
+        Log.i(TAG,"Creating Folder............");
+        GoogleDrive.addTabs(googleAPICredentials(), configJSON);
+        savedCallbackContext.success();
+    }
+
+    private void upload(JSONObject configJSON) throws Exception {
+        Log.i(TAG,"Creating Folder............");
+        GoogleDrive.uploadFile(googleAPICredentials(), configJSON);
+        savedCallbackContext.success();
+    }
+
+    private void download(JSONObject configJSON) throws Exception {
+        Log.i(TAG,"Creating Folder............");
+        GoogleDrive.downloadFile(googleAPICredentials(), configJSON);
         savedCallbackContext.success();
     }
 

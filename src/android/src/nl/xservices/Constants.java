@@ -15,9 +15,12 @@ public interface Constants {
     String ACTION_CREATE_FILE   = "createFile";
     String ACTION_CREATE_FOLDER = "createFolder";
     String ACTION_CREATE_SHEET  = "createSheet";
+    String ACTION_ADD_TAB_SHEET = "addTabsInSheet";
     String ACTION_LIST_FILES    = "listFiles";
     String ACTION_DELETE_FILES  = "deleteFile";
     String ACTION_DELETE_FOLDER = "deleteFolder";
+    String ACTION_DOWNLOAD_FILE = "downloadFile";
+    String ACTION_UPLOAD_FILE   = "uploadFile";
     String ACTION_TRY_SILENT_LOGIN = "trySilentLogin";
     String ACTION_GET_SIGNING_CERTIFICATE_FINGERPRINT = "getSigningCertificateFingerprint";
 
