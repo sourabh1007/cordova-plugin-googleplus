@@ -53,6 +53,14 @@ GooglePlus.prototype.downloadFile = function (options, successCallback, errorCal
   cordova.exec(successCallback, errorCallback, "GooglePlus", "downloadFile", [options]);
 };
 
+GooglePlus.prototype.createSheet = function (options, successCallback, errorCallback) {
+  cordova.exec(successCallback, errorCallback, "GooglePlus", "createSheet", [options]);
+};
+
+GooglePlus.prototype.updateSheet = function (options, successCallback, errorCallback) {
+  cordova.exec(successCallback, errorCallback, "GooglePlus", "updateSheet", [options]);
+};
+
 GooglePlus.install = function () {
   if (!window.plugins) {
     window.plugins = {};

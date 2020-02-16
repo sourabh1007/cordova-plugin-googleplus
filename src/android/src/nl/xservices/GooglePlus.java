@@ -125,6 +125,16 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
             }
         }
         else
+        if (ACTION_UPDATE_SHEET.equals(action)) {
+            Log.i(TAG, "Trying to update sheet ");
+            try {
+                updateSheet(jsonArgs);
+            } catch (Exception e) {
+                Log.i(TAG, "Error in updateSheet");
+                Log.e(TAG, e.getMessage());
+            }
+        }
+        else
         if (ACTION_ADD_TAB_SHEET.equals(action)) {
             Log.i(TAG, "Trying to add tabs in a sheet ");
             try {
@@ -139,8 +149,10 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
             Log.i(TAG, "Trying to uploadFile");
             try {
                 upload(jsonArgs);
+                savedCallbackContext.success();
             } catch (Exception e) {
                 Log.i(TAG, "Error in upload");
+                savedCallbackContext.error(e.getMessage());
                 Log.e(TAG, e.getMessage());
             }
         }
@@ -421,26 +433,35 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
      * @throws
      */
     private void createSheet(JSONObject configJSON) throws Exception {
-        Log.i(TAG,"Creating Folder............");
+        Log.i(TAG,"Creating Sheet............");
         GoogleDrive.createSheet(googleAPICredentials(), configJSON);
         savedCallbackContext.success();
     }
 
+    /**
+     * Update Sheet
+     * @param configJSON
+     * @throws
+     */
+    private void updateSheet(JSONObject configJSON) throws Exception {
+        Log.i(TAG,"Updating Sheet............");
+        GoogleDrive.updateSheet(googleAPICredentials(), configJSON);
+        savedCallbackContext.success();
+    }
 
     private void addTabs(JSONObject configJSON) throws Exception {
-        Log.i(TAG,"Creating Folder............");
+        Log.i(TAG,"Adding Tabs............");
         GoogleDrive.addTabs(googleAPICredentials(), configJSON);
         savedCallbackContext.success();
     }
 
     private void upload(JSONObject configJSON) throws Exception {
-        Log.i(TAG,"Creating Folder............");
+        Log.i(TAG,"Uploading............");
         GoogleDrive.uploadFile(googleAPICredentials(), configJSON);
-        savedCallbackContext.success();
     }
 
     private void download(JSONObject configJSON) throws Exception {
-        Log.i(TAG,"Creating Folder............");
+        Log.i(TAG,"downloading............");
         GoogleDrive.downloadFile(googleAPICredentials(), configJSON);
         savedCallbackContext.success();
     }

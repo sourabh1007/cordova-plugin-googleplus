@@ -8,12 +8,7 @@ import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.model.File;
 import com.google.api.services.drive.model.FileList;
 import com.google.api.services.sheets.v4.Sheets;
-import com.google.api.services.sheets.v4.model.AddSheetRequest;
-import com.google.api.services.sheets.v4.model.BatchUpdateSpreadsheetRequest;
-import com.google.api.services.sheets.v4.model.Request;
-import com.google.api.services.sheets.v4.model.SheetProperties;
-import com.google.api.services.sheets.v4.model.Spreadsheet;
-import com.google.api.services.sheets.v4.model.SpreadsheetProperties;
+import com.google.api.services.sheets.v4.model.*;
 import com.google.gson.Gson;
 
 import org.json.JSONArray;
@@ -24,6 +19,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -73,7 +69,7 @@ public class GoogleDrive {
                 .setFields("id, parents").execute();
     }
 
-    public static String createFile  (GoogleCredential credential, JSONObject configJSON) {
+    public static String createFile(GoogleCredential credential, JSONObject configJSON) {
         Log.i(TAG,"Triggering Create File...." + new Gson().toJson(configJSON));
 
         try {
@@ -159,7 +155,6 @@ public class GoogleDrive {
     }
 
     public static List<File> listFiles(GoogleCredential credential) {
-
         List<File> files = new ArrayList<>();
         try {
             FileList result = createDriveService(credential).files().list()
@@ -178,7 +173,6 @@ public class GoogleDrive {
     }
 
     public static void deleteFileOrFolder(GoogleCredential credential, JSONObject configJSON) {
-
         try {
             String fileid = configJSON.getString("fileid");
             createDriveService(credential).files().delete(fileid).execute();
@@ -191,7 +185,6 @@ public class GoogleDrive {
     }
 
     public static void uploadFile(GoogleCredential credential, JSONObject configJSON) {
-
         try {
             java.io.File filePath = (java.io.File) configJSON.get("file");
             String type = configJSON.getString("type");
@@ -229,7 +222,6 @@ public class GoogleDrive {
         createDriveService(credential).files().get(fileId)
                 .executeMediaAndDownloadTo(outputStream);
     }
-
     /**
      * Google Sheet APIs
      */
@@ -239,8 +231,9 @@ public class GoogleDrive {
                 .build();
     }
 
-    public static String createSheet (GoogleCredential credential, JSONObject configJSON) {
+    public static String createSheet(GoogleCredential credential, JSONObject configJSON) {
         Log.i(TAG,"Triggering Create File.....");
+        Log.i(TAG,configJSON.toString());
         Spreadsheet spreadsheet;
         try {
             String filename = configJSON.getString("name");
@@ -254,7 +247,6 @@ public class GoogleDrive {
                     tabList.add(tabListinJson.getString(tabCount));
                 }
             }
-
             spreadsheet = new Spreadsheet()
                     .setProperties(new SpreadsheetProperties().setTitle(filename));
 
@@ -279,7 +271,6 @@ public class GoogleDrive {
 
     public static void addTabs(GoogleCredential credential, JSONObject configJSON)
             throws IOException, JSONException {
-
         List<String> tabList = new ArrayList<>();
         String spreadsheetId = configJSON.getString("spreadsheetId");
         JSONArray tabListinJson = configJSON.getJSONArray("tabs");
@@ -295,7 +286,6 @@ public class GoogleDrive {
 
     private static void addTabs(GoogleCredential credential, Spreadsheet spreadsheet, List<String> tabs)
             throws IOException {
-
         BatchUpdateSpreadsheetRequest batchUpdateSpreadsheetRequest = new BatchUpdateSpreadsheetRequest();
         List<Request> reqList  = new ArrayList<>();
         for(String tabName : tabs) {
@@ -311,5 +301,48 @@ public class GoogleDrive {
 
         createSheetsService(credential).spreadsheets()
                 .batchUpdate(spreadsheet.getSpreadsheetId(), batchUpdateSpreadsheetRequest).execute();
+    }
+
+    public static int updateSheet(GoogleCredential credential, JSONObject configJSON) throws JSONException, IOException {
+        Log.i(TAG,"updateSheet.....");
+        Log.i(TAG,configJSON.toString());
+        if(!configJSON.has("data") || !configJSON.has("sheetId")) {
+            Log.e(TAG, "sheetId, data are mandatory");
+        }
+        List<List<Object>> values = new ArrayList<>();
+        try {
+            JSONArray rows = configJSON.getJSONArray("data"); // Get all JSONArray data
+            int rowCount = rows.length();
+            for (int count = 0; count < rowCount; count++) {
+                JSONArray jsonArr = rows.getJSONArray(count);
+                List<Object> colValue = new ArrayList<>();
+                int columnCount = jsonArr.length();
+                for (int colCount = 0; colCount < columnCount; colCount++) {
+                    colValue.add(jsonArr.getString(colCount));
+                }
+                values.add(colValue);
+            }
+        } catch (JSONException e) {
+            Log.e(TAG, "Error while reading JSON");
+            e.printStackTrace();
+        }
+        Log.i(TAG,"data is ");
+        Log.i(TAG, Arrays.toString(values.toArray()));
+
+        String spreadsheetId = configJSON.getString("sheetId");
+        List<ValueRange> data = new ArrayList<>();
+        data.add(new ValueRange()
+                .setRange("A1")
+                .setValues(values));
+
+        BatchUpdateValuesRequest body = new BatchUpdateValuesRequest()
+                .setValueInputOption("RAW")
+                .setData(data);
+        BatchUpdateValuesResponse result =
+                createSheetsService(credential).spreadsheets().values().batchUpdate(spreadsheetId, body).execute();
+        int rows = result.getTotalUpdatedCells();
+        Log.i(TAG, rows + "cells updated.");
+
+        return rows;
     }
 }

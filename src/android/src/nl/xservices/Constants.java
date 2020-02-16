@@ -15,6 +15,7 @@ public interface Constants {
     String ACTION_CREATE_FILE   = "createFile";
     String ACTION_CREATE_FOLDER = "createFolder";
     String ACTION_CREATE_SHEET  = "createSheet";
+    String ACTION_UPDATE_SHEET  = "updateSheet";
     String ACTION_ADD_TAB_SHEET = "addTabsInSheet";
     String ACTION_LIST_FILES    = "listFiles";
     String ACTION_DELETE_FILES  = "deleteFile";
