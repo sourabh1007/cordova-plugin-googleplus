@@ -106,17 +106,20 @@ public class GoogleDrive {
         }
     }
 
-    public static String createFolder(GoogleCredential credential, JSONObject folderConfig) {
+    public static JSONObject createFolder(GoogleCredential credential, JSONObject folderConfig) {
         Log.i(TAG,"Triggering Create Folder....." + new Gson().toJson(folderConfig));
         String folderId;
+        JSONObject response = new JSONObject();
         try {
             String folderName = folderConfig.getString("name");
             if(null == folderName || folderName.isEmpty()) {
                 folderName = APPLICATION_NAME;
+                response.put("name", folderName);
             }
             String parentFolderId = null;
             if(folderConfig.has("parentFolderId")) {
                 parentFolderId = folderConfig.getString("parentFolderId");
+                response.put("parentFolderId", parentFolderId);
                 Log.i(TAG, "parentFolderId : " + parentFolderId);
             }
 
@@ -130,19 +133,20 @@ public class GoogleDrive {
 
                 File folder = createDriveService(credential).files().create(folderMetadata).execute();
                 folderId = folder.getId();
+                response.put("parentFolderId", parentFolderId);
                 if(folderConfig.has("files")) {
                     JSONArray fileConfigArray = folderConfig.getJSONArray("files");
                     for(int fileCount = 0; fileCount < fileConfigArray.length(); fileCount++) {
                         JSONObject fileConfig = fileConfigArray.getJSONObject(fileCount);
                         fileConfig.put("parentFolderId", folderId);
-                        createFile(credential, fileConfig);
+                        response.put(fileConfig.getString("name"), createFile(credential, fileConfig));
                     }
                     Log.i(TAG,"Created folder successfully with files");
 
                 } else {
                     Log.i(TAG,"Created folder successfully.");
                 }
-                return folderId;
+                return response;
             }
             else {
                 Log.i(TAG,"folderName....." + folderName + " found so skip creating it");

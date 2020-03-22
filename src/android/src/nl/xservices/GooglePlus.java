@@ -414,8 +414,8 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
      */
     private void createFolder(JSONObject configJSON) throws Exception {
         Log.i(TAG,"Creating Folder............");
-        GoogleDrive.createFolder(googleAPICredentials(), configJSON);
-        savedCallbackContext.success();
+        JSONObject folderInfo = GoogleDrive.createFolder(googleAPICredentials(), configJSON);
+        savedCallbackContext.success(folderInfo);
     }
 
     /**
