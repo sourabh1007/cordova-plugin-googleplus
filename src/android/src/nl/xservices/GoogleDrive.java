@@ -43,15 +43,15 @@ public class GoogleDrive {
                 .build();
     }
 
-    private static boolean isFolderExists(GoogleCredential credential, String folderName)
+    private static FileList getFolderInformation(GoogleCredential credential, String folderName)
             throws IOException {
         Log.i(TAG,"Checking if folder exists : folderName : " + folderName);
 
         FileList folderList = createDriveService(credential).files().list().setQ(
                 "mimeType='application/vnd.google-apps.folder' and trashed=false and name='" + folderName+"'").execute();
 
-        Log.i(TAG, "folderList.size() " + folderList.getFiles().size());
-        return !folderList.getFiles().isEmpty();
+        Log.i(TAG, "folderList.getFiles().size() " + folderList.getFiles().size());
+        return folderList;
     }
 
     private static void moveFile(GoogleCredential credential, String fileId, String newParentFolder)
@@ -72,10 +72,11 @@ public class GoogleDrive {
     public static String createFile(GoogleCredential credential, JSONObject configJSON) {
         Log.i(TAG,"Triggering Create File...." + new Gson().toJson(configJSON));
 
+        String fileType = MIME_TYPE_TEXT_PLAIN;
+        String fileId = null;
         try {
             String filename = configJSON.getString("name");
             Log.i(TAG, "filename : " + filename);
-            String fileType = MIME_TYPE_TEXT_PLAIN;
             if(configJSON.has("type")) {
                 fileType = configJSON.getString("type");
                 if(MIME_TYPE_GOOGLE_SHEET.equals(fileType)) {
@@ -83,6 +84,7 @@ public class GoogleDrive {
                 }
             }
             Log.i(TAG, "fileType : " + fileType);
+
             String parentFolderId = configJSON.getString("parentFolderId");
             Log.i(TAG, "parentFolderId : " + parentFolderId);
 
@@ -91,71 +93,78 @@ public class GoogleDrive {
             if(null != parentFolderId && !parentFolderId.isEmpty())
                 fileMetadata.setParents(Collections.singletonList(parentFolderId));
 
-            FileContent mediaContent = new FileContent(fileType,
-                    java.io.File.createTempFile(filename + "-tmp", "config"));
-            File file = createDriveService(credential).files().create(fileMetadata, mediaContent)
-                    .setFields("id, parents")
-                    .execute();
-
-            Log.i(TAG,"File ID: " + file.getId());
-            return file.getId();
+            FileList files = createDriveService(credential)
+                    .files().list().setQ("trashed=false and name='" + filename+"'").execute();
+            if(files.getFiles().size() == 0) {
+                File file = createDriveService(credential)
+                        .files()
+                        .create(fileMetadata, new FileContent(fileType,
+                                java.io.File.createTempFile(filename + "-tmp", "config")))
+                        .setFields("id, parents")
+                        .execute();
+                fileId = file.getId();
+                Log.i(TAG, "Creating File " + filename);
+            } else {
+                fileId = files.getFiles().get(0).getId();
+            }
+            Log.i(TAG,"File ID: " + fileId);
 
         } catch (Exception ex) {
-            Log.e(TAG,ex.getMessage());
-            return null;
+            ex.printStackTrace();
+            Log.e(TAG, ex.getMessage());
         }
+        return fileId;
     }
 
     public static JSONObject createFolder(GoogleCredential credential, JSONObject folderConfig) {
         Log.i(TAG,"Triggering Create Folder....." + new Gson().toJson(folderConfig));
-        String folderId;
+        String folderId = null;
         JSONObject response = new JSONObject();
         try {
             String folderName = folderConfig.getString("name");
             if(null == folderName || folderName.isEmpty()) {
                 folderName = APPLICATION_NAME;
-                response.put("name", folderName);
             }
-            String parentFolderId = null;
-            if(folderConfig.has("parentFolderId")) {
-                parentFolderId = folderConfig.getString("parentFolderId");
-                response.put("parentFolderId", parentFolderId);
-                Log.i(TAG, "parentFolderId : " + parentFolderId);
-            }
+            response.put("parentFolderName", folderName);
 
-            if(!isFolderExists(credential, folderName)) {
+            if(folderConfig.has("parentFolderId")) {
+                folderId = folderConfig.getString("parentFolderId");
+                Log.i(TAG, "parentFolderId : " + folderId);
+            }
+            FileList folderList = getFolderInformation(credential, folderName);
+            if(null == folderList || folderList.getFiles().size() == 0) {
                 Log.i(TAG,"folderName....." + folderName + " NOT found so creating it");
                 File folderMetadata = new File();
                 folderMetadata.setMimeType(MIME_TYPE_FOLDER);
                 folderMetadata.setName(folderName);
-                if(null != parentFolderId && !parentFolderId.isEmpty())
-                    folderMetadata.setParents(Collections.singletonList(parentFolderId));
+                if(null != folderId && !folderId.isEmpty())
+                    folderMetadata.setParents(Collections.singletonList(folderId));
 
                 File folder = createDriveService(credential).files().create(folderMetadata).execute();
                 folderId = folder.getId();
-                response.put("parentFolderId", parentFolderId);
-                if(folderConfig.has("files")) {
-                    JSONArray fileConfigArray = folderConfig.getJSONArray("files");
-                    for(int fileCount = 0; fileCount < fileConfigArray.length(); fileCount++) {
-                        JSONObject fileConfig = fileConfigArray.getJSONObject(fileCount);
-                        fileConfig.put("parentFolderId", folderId);
-                        response.put(fileConfig.getString("name"), createFile(credential, fileConfig));
-                    }
-                    Log.i(TAG,"Created folder successfully with files");
-
-                } else {
-                    Log.i(TAG,"Created folder successfully.");
-                }
-                return response;
+                Log.i(TAG, "folder created with id " + folderId + ", name " + folderName);
             }
             else {
+                folderId = folderList.getFiles().get(0).getId();
+                Log.i(TAG, "folder exists with id " + folderId + ", name " + folderName);
                 Log.i(TAG,"folderName....." + folderName + " found so skip creating it");
-                return null;
+            }
+            response.put("parentFolderId", folderId);
+
+            if(folderConfig.has("files")) {
+                Log.i(TAG,"Creating files.....");
+                JSONArray fileConfigArray = folderConfig.getJSONArray("files");
+                for(int fileCount = 0; fileCount < fileConfigArray.length(); fileCount++) {
+                    JSONObject fileConfig = fileConfigArray.getJSONObject(fileCount);
+                    fileConfig.put("parentFolderId", folderId);
+                    response.put(fileConfig.getString("name"), createFile(credential, fileConfig));
+                }
             }
         } catch (Exception ex) {
-            Log.e(TAG,ex.getMessage());
-            return null;
+            ex.printStackTrace();
+            Log.e(TAG, ex.getMessage());
         }
+        return response;
     }
 
     public static List<File> listFiles(GoogleCredential credential) {
@@ -238,7 +247,7 @@ public class GoogleDrive {
     public static String createSheet(GoogleCredential credential, JSONObject configJSON) {
         Log.i(TAG,"Triggering Create File.....");
         Log.i(TAG,configJSON.toString());
-        Spreadsheet spreadsheet;
+        String spreadsheetId = null;
         try {
             String filename = configJSON.getString("name");
             String parentFolderId = configJSON.getString("parentFolderId");
@@ -251,26 +260,31 @@ public class GoogleDrive {
                     tabList.add(tabListinJson.getString(tabCount));
                 }
             }
-            spreadsheet = new Spreadsheet()
-                    .setProperties(new SpreadsheetProperties().setTitle(filename));
+            FileList files = createDriveService(credential)
+                    .files().list().setQ("trashed=false and name='" + filename+"'").execute();
+            if(files.getFiles().size() == 0) {
+                Spreadsheet spreadsheet = new Spreadsheet()
+                        .setProperties(new SpreadsheetProperties().setTitle(filename));
+                spreadsheet = createSheetsService(credential).spreadsheets().create(spreadsheet)
+                        .setFields("spreadsheetId")
+                        .execute();
 
-            spreadsheet = createSheetsService(credential).spreadsheets().create(spreadsheet)
-                    .setFields("spreadsheetId")
-                    .execute();
+                if(!tabList.isEmpty()) {
+                    addTabs(credential, spreadsheet, tabList);
+                }
 
-            if(!tabList.isEmpty()) {
-                addTabs(credential, spreadsheet, tabList);
+                moveFile(credential, spreadsheet.getSpreadsheetId(), parentFolderId);
+
+                spreadsheetId = spreadsheet.getSpreadsheetId();
+            } else {
+                spreadsheetId = files.getFiles().get(0).getId();
             }
-
-            moveFile(credential, spreadsheet.getSpreadsheetId(), parentFolderId);
-
         } catch (Exception ex) {
-            Log.e(TAG,ex.getMessage());
-            return null;
+            ex.printStackTrace();
+            Log.e(TAG, ex.getMessage());
         }
-
-        Log.i(TAG,"Spreadsheet ID: " + spreadsheet.getSpreadsheetId());
-        return spreadsheet.getSpreadsheetId();
+        Log.i(TAG,"Spreadsheet ID: " + spreadsheetId);
+        return spreadsheetId;
     }
 
     public static void addTabs(GoogleCredential credential, JSONObject configJSON)
