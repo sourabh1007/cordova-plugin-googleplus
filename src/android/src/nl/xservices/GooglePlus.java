@@ -112,6 +112,7 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
             } catch (Exception e) {
                 Log.i(TAG, "Error in createfile");
                 Log.e(TAG, e.getMessage());
+                e.printStackTrace();
             }
         }
         else
@@ -122,6 +123,7 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
             } catch (Exception e) {
                 Log.i(TAG, "Error in createSheet");
                 Log.e(TAG, e.getMessage());
+                e.printStackTrace();
             }
         }
         else
@@ -132,6 +134,7 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
             } catch (Exception e) {
                 Log.i(TAG, "Error in updateSheet");
                 Log.e(TAG, e.getMessage());
+                e.printStackTrace();
             }
         }
         else
@@ -142,6 +145,7 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
             } catch (Exception e) {
                 Log.i(TAG, "Error in add tabs in a sheet");
                 Log.e(TAG, e.getMessage());
+                e.printStackTrace();
             }
         }
         else
@@ -154,6 +158,7 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
                 Log.i(TAG, "Error in upload");
                 savedCallbackContext.error(e.getMessage());
                 Log.e(TAG, e.getMessage());
+                e.printStackTrace();
             }
         }
         else
@@ -164,6 +169,7 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
             } catch (Exception e) {
                 Log.i(TAG, "Error in download");
                 Log.e(TAG, e.getMessage());
+                e.printStackTrace();
             }
         }
         else
@@ -174,6 +180,7 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
             } catch (Exception e) {
                 Log.i(TAG, "Error in createFolder");
                 Log.e(TAG, e.getMessage());
+                e.printStackTrace();
             }
 
         }
@@ -185,6 +192,7 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
             } catch (Exception e) {
                 Log.i(TAG, "Error in listFiles");
                 Log.e(TAG, e.getMessage());
+                e.printStackTrace();
             }
 
         }
@@ -196,6 +204,7 @@ public class GooglePlus extends CordovaPlugin implements GoogleApiClient.OnConne
             } catch (Exception e) {
                 Log.i(TAG, "Error in deleteFile");
                 Log.e(TAG, e.getMessage());
+                e.printStackTrace();
             }
         }
         else

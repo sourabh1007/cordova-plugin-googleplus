@@ -56,6 +56,7 @@ public class GoogleDrive {
 
     private static void moveFile(GoogleCredential credential, String fileId, String newParentFolder)
             throws IOException {
+        Log.i(TAG,"Moving file to parent folder : " + newParentFolder);
         File file = createDriveService(credential).files().get(fileId)
                 .setFields("parents")
                 .execute();
@@ -67,6 +68,7 @@ public class GoogleDrive {
         createDriveService(credential).files().update(fileId,
                 null).setAddParents(newParentFolder).setRemoveParents(previousParents.toString())
                 .setFields("id, parents").execute();
+        Log.i(TAG,"Moving file to parent folder Successful");
     }
 
     public static String createFile(GoogleCredential credential, JSONObject configJSON) {
@@ -245,13 +247,11 @@ public class GoogleDrive {
     }
 
     public static String createSheet(GoogleCredential credential, JSONObject configJSON) {
-        Log.i(TAG,"Triggering Create File.....");
+        Log.i(TAG,"Triggering Create Sheet.....");
         Log.i(TAG,configJSON.toString());
         String spreadsheetId = null;
         try {
             String filename = configJSON.getString("name");
-            String parentFolderId = configJSON.getString("parentFolderId");
-
             List<String> tabList = new ArrayList<>();
             if(configJSON.has("tabs")) {
                 JSONArray tabListinJson = configJSON.getJSONArray("tabs");
@@ -260,30 +260,38 @@ public class GoogleDrive {
                     tabList.add(tabListinJson.getString(tabCount));
                 }
             }
+
+            Log.i(TAG,"Got tag Information....." + tabList);
             FileList files = createDriveService(credential)
-                    .files().list().setQ("trashed=false and name='" + filename+"'").execute();
+                    .files()
+                    .list()
+                    .setQ("trashed=false and name='" + filename+"'").execute();
+
             if(files.getFiles().size() == 0) {
+                Log.i(TAG,"Sheet does not exist. So creating one ");
                 Spreadsheet spreadsheet = new Spreadsheet()
                         .setProperties(new SpreadsheetProperties().setTitle(filename));
-                spreadsheet = createSheetsService(credential).spreadsheets().create(spreadsheet)
-                        .setFields("spreadsheetId")
-                        .execute();
-
                 if(!tabList.isEmpty()) {
-                    addTabs(credential, spreadsheet, tabList);
+                    Log.i(TAG,"Tabs are defined so call addTabs");
+                    spreadsheet = addTabs(credential, spreadsheet, tabList);
+                } else {
+                    Log.i(TAG,"Tabs are NOT defined, creating sheet with default tab");
+                    spreadsheet = createSheetsService(credential).spreadsheets().create(spreadsheet)
+                            .setFields("spreadsheetId")
+                            .execute();
                 }
-
-                moveFile(credential, spreadsheet.getSpreadsheetId(), parentFolderId);
-
+                Log.i(TAG,"Created Spreadsheet Successfully. SpreadsheetId : " + spreadsheetId);
                 spreadsheetId = spreadsheet.getSpreadsheetId();
+                moveFile(credential, spreadsheetId, configJSON.getString("parentFolderId"));
             } else {
+                Log.i(TAG,"Sheet exists.");
                 spreadsheetId = files.getFiles().get(0).getId();
             }
+
         } catch (Exception ex) {
             ex.printStackTrace();
             Log.e(TAG, ex.getMessage());
         }
-        Log.i(TAG,"Spreadsheet ID: " + spreadsheetId);
         return spreadsheetId;
     }
 
@@ -296,49 +304,53 @@ public class GoogleDrive {
         for(int tabCount = 0; tabCount < tabLength; tabCount++) {
             tabList.add(tabListinJson.getString(tabCount));
         }
-
         Spreadsheet spreadsheet = createSheetsService(credential).spreadsheets().get(spreadsheetId).execute();
         addTabs(credential, spreadsheet, tabList);
 
     }
 
-    private static void addTabs(GoogleCredential credential, Spreadsheet spreadsheet, List<String> tabs)
+    private static Spreadsheet addTabs(GoogleCredential credential, Spreadsheet spreadsheet, List<String> tabs)
             throws IOException {
-        BatchUpdateSpreadsheetRequest batchUpdateSpreadsheetRequest = new BatchUpdateSpreadsheetRequest();
-        List<Request> reqList  = new ArrayList<>();
+        List<Sheet> sheets = new ArrayList<>();
         for(String tabName : tabs) {
-            AddSheetRequest addSheetReq = new AddSheetRequest();
-            addSheetReq.setProperties(new SheetProperties().setTitle(tabName));
-
-            Request request = new Request();
-            request.setAddSheet(addSheetReq);
-
-            reqList.add(request);
+            Sheet sheet = new Sheet();
+            sheet.setProperties(new SheetProperties().setTitle(tabName));
+            sheets.add(sheet);
         }
-        batchUpdateSpreadsheetRequest.setRequests(reqList);
-
-        createSheetsService(credential).spreadsheets()
-                .batchUpdate(spreadsheet.getSpreadsheetId(), batchUpdateSpreadsheetRequest).execute();
+        spreadsheet.setSheets(sheets);
+        Spreadsheet finalSheet = createSheetsService(credential).spreadsheets().create(spreadsheet).execute();
+        return finalSheet;
     }
 
     public static int updateSheet(GoogleCredential credential, JSONObject configJSON) throws JSONException, IOException {
-        Log.i(TAG,"updateSheet.....");
-        Log.i(TAG,configJSON.toString());
+        Log.i(TAG,"Triggering updateSheet.....");
         if(!configJSON.has("data") || !configJSON.has("sheetId")) {
             Log.e(TAG, "sheetId, data are mandatory");
         }
         List<List<Object>> values = new ArrayList<>();
+        List<ValueRange> data = new ArrayList<>();
         try {
-            JSONArray rows = configJSON.getJSONArray("data"); // Get all JSONArray data
-            int rowCount = rows.length();
-            for (int count = 0; count < rowCount; count++) {
-                JSONArray jsonArr = rows.getJSONArray(count);
-                List<Object> colValue = new ArrayList<>();
-                int columnCount = jsonArr.length();
-                for (int colCount = 0; colCount < columnCount; colCount++) {
-                    colValue.add(jsonArr.getString(colCount));
+            JSONArray tabs = configJSON.getJSONArray("data"); // Get all JSONArray data
+            int tabCount = tabs.length();
+
+            for (int count = 0; count < tabCount; count++) {
+                JSONObject tabInfo = tabs.getJSONObject(count);
+                String tabName = tabInfo.getString("tabName");
+                JSONArray tabContent = tabInfo.getJSONArray("content");// Get all JSONArray data
+                int rowCount = tabContent.length();
+                for (int rCount = 0; rCount < rowCount; rCount++) {
+                    JSONArray jsonArr = tabContent.getJSONArray(rCount);
+                    List<Object> colValue = new ArrayList<>();
+                    int columnCount = jsonArr.length();
+                    for (int colCount = 0; colCount < columnCount; colCount++) {
+                        colValue.add(jsonArr.getString(colCount));
+                    }
+                    values.add(colValue);
                 }
-                values.add(colValue);
+                data.add(new ValueRange()
+                        .setRange("'" + tabName + "'!A1:Z")
+                        .setValues(values)
+                );
             }
         } catch (JSONException e) {
             Log.e(TAG, "Error while reading JSON");
@@ -348,16 +360,14 @@ public class GoogleDrive {
         Log.i(TAG, Arrays.toString(values.toArray()));
 
         String spreadsheetId = configJSON.getString("sheetId");
-        List<ValueRange> data = new ArrayList<>();
-        data.add(new ValueRange()
-                .setRange("A1")
-                .setValues(values));
-
         BatchUpdateValuesRequest body = new BatchUpdateValuesRequest()
                 .setValueInputOption("RAW")
                 .setData(data);
+
         BatchUpdateValuesResponse result =
-                createSheetsService(credential).spreadsheets().values().batchUpdate(spreadsheetId, body).execute();
+                createSheetsService(credential).spreadsheets()
+                        .values()
+                        .batchUpdate(spreadsheetId, body).execute();
         int rows = result.getTotalUpdatedCells();
         Log.i(TAG, rows + "cells updated.");
 
